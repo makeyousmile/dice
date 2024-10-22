@@ -5,6 +5,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/text"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 	"golang.org/x/image/font/basicfont"
 	"image"
 	"image/color"
@@ -27,7 +28,7 @@ const (
 )
 
 var (
-	options       = []string{"1 Player", "2 Players", "3 Players", "4 Players"}
+	options       = []string{"2 Players", "3 Players", "4 Players"}
 	selectedIndex = 0
 	lastKeyPress  = time.Now()             // Время последнего нажатия клавиши
 	delay         = 200 * time.Millisecond // Задержка между нажатиями
@@ -45,6 +46,11 @@ type Game struct {
 	diceImage2    *ebiten.Image
 	count         int
 	stage         int
+	players       int
+	result        []int
+}
+type Player struct {
+	result []int
 }
 
 // NewGame создаёт новую игру и загружает изображения кубика
@@ -54,8 +60,13 @@ func NewGame() *Game {
 	g.height = screenHeight
 	g.diceImage1, _, _ = ebitenutil.NewImageFromFile("dice.png")
 	g.diceImage2, _, _ = ebitenutil.NewImageFromFile("dice.png")
-
-	// Создание изображений граней кубика (6 граней)
+	g.result = make([]int, 6)
+	g.result[0] = rand.Intn(5)
+	g.result[1] = rand.Intn(5)
+	g.result[2] = rand.Intn(5)
+	g.result[3] = rand.Intn(5)
+	g.result[4] = rand.Intn(5)
+	g.result[5] = rand.Intn(5)
 
 	// Инициализируем случайное число для броска
 	rand.Seed(time.Now().UnixNano())
@@ -85,6 +96,7 @@ func (g *Game) Update() error {
 		if ebiten.IsKeyPressed(ebiten.KeyEnter) {
 			fmt.Printf("Selected option: %s\n", options[selectedIndex])
 			g.stage = 1
+			g.players = selectedIndex
 		}
 	}
 
@@ -98,8 +110,7 @@ func (g *Game) Update() error {
 	if g.rolling {
 		now := time.Now()
 		if now.Sub(g.lastFrameTime) > frameDelay {
-			g.currentFace1 = rand.Intn(6) // каждые frameDelay мс показываем случайное число
-			g.currentFace2 = rand.Intn(6) // каждые frameDelay мс показываем случайное число
+
 			g.lastFrameTime = now
 		}
 		// Если прошло больше времени, чем rollDuration, останавливаем анимацию
@@ -119,6 +130,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	case 0:
 		menu(screen)
 	case 1:
+		b := []int{56, 99}
+		score(screen, b)
 		g.StartGame(screen)
 
 	}
@@ -137,46 +150,42 @@ func (g *Game) StartRolling() {
 	g.rolling = true
 	g.startTime = time.Now()
 	g.lastFrameTime = g.startTime
+	g.result[0] = rand.Intn(5)
+	g.result[1] = rand.Intn(5)
+	g.result[2] = rand.Intn(5)
+	g.result[3] = rand.Intn(5)
+	g.result[4] = rand.Intn(5)
+	g.result[5] = rand.Intn(5)
 }
 
 func (g *Game) StartGame(screen *ebiten.Image) {
 	if g.rolling {
-		op1 := &ebiten.DrawImageOptions{}
-		op1.GeoM.Translate(-float64(frameWidth)/2, -float64(frameHeight)/2)
-		op1.GeoM.Translate(screenWidth/2-75, screenHeight/2)
-		i := (g.count / 5) % frameCount
-		sx, sy := frameOX+i*frameWidth, frameOY
-		screen.DrawImage(g.diceImage1.SubImage(image.Rect(sx, sy, sx+frameWidth-2, sy+frameHeight)).(*ebiten.Image), op1)
-
-		op2 := &ebiten.DrawImageOptions{}
-		op2.GeoM.Translate(-float64(frameWidth)/2, -float64(frameHeight)/2)
-		op2.GeoM.Translate(screenWidth/2+75, screenHeight/2)
-		i2 := (g.count / 5) % frameCount
-		sx2, sy2 := frameOX+i2*frameWidth, frameOY
-		screen.DrawImage(g.diceImage1.SubImage(image.Rect(sx2, sy2, sx2+frameWidth-2, sy2+frameHeight)).(*ebiten.Image), op2)
+		for i := 0; i < 5; i++ {
+			op1 := &ebiten.DrawImageOptions{}
+			op1.GeoM.Translate(-float64(frameWidth)/2, -float64(frameHeight)/2)
+			op1.GeoM.Translate(300+100*float64(i), screenHeight/2)
+			n := (g.count / 5) % frameCount
+			sx, sy := frameOX+n*frameWidth, frameOY
+			screen.DrawImage(g.diceImage1.SubImage(image.Rect(sx, sy, sx+frameWidth-2, sy+frameHeight)).(*ebiten.Image), op1)
+		}
 
 	} else {
-		// Показываем финальный результат (грань, на которой остановился кубик)
-		op1 := &ebiten.DrawImageOptions{}
-		op1.GeoM.Translate(-float64(frameWidth)/2, -float64(frameHeight)/2)
-		op1.GeoM.Translate(screenWidth/2-75, screenHeight/2)
+		for i := 0; i < 5; i++ {
+			// Показываем финальный результат (грань, на которой остановился кубик)
+			op1 := &ebiten.DrawImageOptions{}
+			op1.GeoM.Translate(-float64(frameWidth)/2, -float64(frameHeight)/2)
+			op1.GeoM.Translate(300+100*float64(i), screenHeight/2)
 
-		sx, sy := frameOX+g.currentFace1*frameWidth, frameOY
-		screen.DrawImage(g.diceImage1.SubImage(image.Rect(sx, sy, sx+frameWidth-2, sy+frameHeight)).(*ebiten.Image), op1)
+			sx, sy := frameOX+g.result[i]*frameWidth, frameOY
+			screen.DrawImage(g.diceImage1.SubImage(image.Rect(sx, sy, sx+frameWidth-2, sy+frameHeight)).(*ebiten.Image), op1)
+		}
 
-		op2 := &ebiten.DrawImageOptions{}
-		op2.GeoM.Translate(-float64(frameWidth)/2, -float64(frameHeight)/2)
-		op2.GeoM.Translate(screenWidth/2+75, screenHeight/2)
-
-		sx2, sy2 := frameOX+g.currentFace2*frameWidth, frameOY
-		screen.DrawImage(g.diceImage1.SubImage(image.Rect(sx2, sy2, sx2+frameWidth-2, sy2+frameHeight)).(*ebiten.Image), op2)
 	}
-	ebitenutil.DebugPrint(screen, "Press SPACE to roll the dice")
+	//ebitenutil.DebugPrint(screen, "Press SPACE to roll the dice")
 }
 func menu(screen *ebiten.Image) {
 
 	face := basicfont.Face7x13
-
 	// Отрисовка меню
 	for i, option := range options {
 		x := screenWidth/2 - 50
@@ -184,10 +193,31 @@ func menu(screen *ebiten.Image) {
 
 		// Если элемент выбран, заливаем его фон другим цветом
 		if i == selectedIndex {
-			ebitenutil.DrawRect(screen, float64(x-10), float64(y-20), 150, 30, color.RGBA{0, 255, 0, 255}) // Зеленый фон
+
+			vector.DrawFilledRect(screen, float32(x-10), float32(y-20), 150, 30, color.RGBA{150, 0, 0, 255}, true) // Зеленый фон
 		}
 
 		// Отрисовка текста опции
 		text.Draw(screen, option, face, x, y, color.White)
 	}
+}
+func score(screen *ebiten.Image, score []int) {
+	face := basicfont.Face7x13
+	// Отрисовка меню
+	x := 10
+	y := 30
+	txt := ""
+	txt += "Player 1:\n"
+	var sum int
+	for i := range score {
+		sum += score[i]
+		txt += fmt.Sprintf("%3d", score[i]) + "\n"
+	}
+	txt += "Result:" + fmt.Sprint(sum) + "\n"
+	// Если элемент выбран, заливаем его фон другим цветом
+	//vector.DrawFilledRect(screen, float32(x), float32(y), 150, 30, color.RGBA{0, 0, 0, 0}, true) // Зеленый фон
+
+	// Отрисовка текста опции
+	text.Draw(screen, txt, face, x, y, color.White)
+
 }
