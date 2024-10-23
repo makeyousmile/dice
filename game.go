@@ -10,6 +10,7 @@ import (
 	"image"
 	"image/color"
 	"math/rand"
+	"sort"
 	"time"
 )
 
@@ -29,28 +30,31 @@ const (
 
 var (
 	options       = []string{"2 Players", "3 Players", "4 Players"}
-	selectedIndex = 0
+	options2      = []string{"No", "Yes"}
+	playerIndex   = 0
+	continueIndex = 1
 	lastKeyPress  = time.Now()             // Время последнего нажатия клавиши
 	delay         = 200 * time.Millisecond // Задержка между нажатиями
 )
 
 // Game struct хранит состояние игры
 type Game struct {
-	currentFace1  int       // текущая грань кубика (индекс в массиве изображений)
-	currentFace2  int       // текущая грань кубика (индекс в массиве изображений)
 	rolling       bool      // флаг, указывающий на то, что кубик в процессе броска
 	startTime     time.Time // время начала анимации
-	lastFrameTime time.Time // время последнего изменения кадра анимации
+	lastFrameTime time.Time // Время последнего изменения кадра анимации
 	width, height int
 	diceImage1    *ebiten.Image
-	diceImage2    *ebiten.Image
 	count         int
 	stage         int
-	players       int
+	players       map[int]Player
+	currentPlayer int
 	result        []int
+	round         int
+	numberOfDice  int
 }
 type Player struct {
-	result []int
+	score        map[int]int
+	numberOfDice int
 }
 
 // NewGame создаёт новую игру и загружает изображения кубика
@@ -59,14 +63,10 @@ func NewGame() *Game {
 	g.width = screenWidth
 	g.height = screenHeight
 	g.diceImage1, _, _ = ebitenutil.NewImageFromFile("dice.png")
-	g.diceImage2, _, _ = ebitenutil.NewImageFromFile("dice.png")
-	g.result = make([]int, 6)
-	g.result[0] = rand.Intn(5)
-	g.result[1] = rand.Intn(5)
-	g.result[2] = rand.Intn(5)
-	g.result[3] = rand.Intn(5)
-	g.result[4] = rand.Intn(5)
-	g.result[5] = rand.Intn(5)
+	g.numberOfDice = 5
+	g.result = g.rollDice()
+	g.round = 0
+	g.players = make(map[int]Player)
 
 	// Инициализируем случайное число для броска
 	rand.Seed(time.Now().UnixNano())
@@ -79,31 +79,61 @@ func (g *Game) Update() error {
 	now := time.Now()
 
 	// Проверяем, прошло ли достаточно времени с момента последнего нажатия
-	if now.Sub(lastKeyPress) > delay {
-		// Перемещение по меню вверх
-		if ebiten.IsKeyPressed(ebiten.KeyUp) && selectedIndex > 0 {
-			selectedIndex--
-			lastKeyPress = now // Сбрасываем время последнего нажатия
-		}
+	switch g.round {
+	case 0:
+		if now.Sub(lastKeyPress) > delay {
+			// Перемещение по меню вверх
+			if ebiten.IsKeyPressed(ebiten.KeyUp) && playerIndex > 0 {
+				playerIndex--
+				lastKeyPress = now // Сбрасываем время последнего нажатия
+			}
 
-		// Перемещение по меню вниз
-		if ebiten.IsKeyPressed(ebiten.KeyDown) && selectedIndex < len(options)-1 {
-			selectedIndex++
-			lastKeyPress = now // Сбрасываем время последнего нажатия
-		}
+			// Перемещение по меню вниз
+			if ebiten.IsKeyPressed(ebiten.KeyDown) && playerIndex < len(options)-1 {
+				playerIndex++
+				lastKeyPress = now // Сбрасываем время последнего нажатия
+			}
 
-		// Подтверждение выбора
-		if ebiten.IsKeyPressed(ebiten.KeyEnter) {
-			fmt.Printf("Selected option: %s\n", options[selectedIndex])
-			g.stage = 1
-			g.players = selectedIndex
+			// Подтверждение выбора
+			if ebiten.IsKeyPressed(ebiten.KeyEnter) {
+				g.stage = 1
+				for i := 0; i <= playerIndex+1; i++ {
+					g.players[i] = Player{score: make(map[int]int), numberOfDice: 5}
+				}
+			}
+		}
+	default:
+		if now.Sub(lastKeyPress) > delay {
+			// Перемещение по меню вверх
+			if ebiten.IsKeyPressed(ebiten.KeyRight) && continueIndex > 0 {
+				continueIndex--
+				lastKeyPress = now // Сбрасываем время последнего нажатия
+			}
+
+			// Перемещение по меню вниз
+			if ebiten.IsKeyPressed(ebiten.KeyLeft) && continueIndex < len(options2)-1 {
+				continueIndex++
+				lastKeyPress = now // Сбрасываем время последнего нажатия
+			}
+
+			// Подтверждение выбора
+			if ebiten.IsKeyPressed(ebiten.KeyEnter) {
+
+			}
 		}
 	}
 
 	g.count++
 	// Если нажата клавиша пробел и анимация не идет, начинаем бросок кубика
 	if ebiten.IsKeyPressed(ebiten.KeySpace) && !g.rolling {
+		if continueIndex == 0 {
+			g.changePlayer()
+			g.round = g.players[g.currentPlayer].getPhase()
+			continueIndex = 1
+			g.numberOfDice = 5
+		}
 		g.StartRolling()
+		g.round++
 	}
 
 	// Если идет анимация, обновляем результат броска в течение времени rollDuration
@@ -116,6 +146,7 @@ func (g *Game) Update() error {
 		// Если прошло больше времени, чем rollDuration, останавливаем анимацию
 		if now.Sub(g.startTime) > rollDuration {
 			g.rolling = false
+
 		}
 	}
 
@@ -130,8 +161,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	case 0:
 		menu(screen)
 	case 1:
-		b := []int{56, 99}
-		score(screen, b)
+		g.score2(screen)
 		g.StartGame(screen)
 
 	}
@@ -150,17 +180,13 @@ func (g *Game) StartRolling() {
 	g.rolling = true
 	g.startTime = time.Now()
 	g.lastFrameTime = g.startTime
-	g.result[0] = rand.Intn(5)
-	g.result[1] = rand.Intn(5)
-	g.result[2] = rand.Intn(5)
-	g.result[3] = rand.Intn(5)
-	g.result[4] = rand.Intn(5)
-	g.result[5] = rand.Intn(5)
+	g.result = g.rollDice()
+
 }
 
 func (g *Game) StartGame(screen *ebiten.Image) {
 	if g.rolling {
-		for i := 0; i < 5; i++ {
+		for i := 0; i < g.numberOfDice; i++ {
 			op1 := &ebiten.DrawImageOptions{}
 			op1.GeoM.Translate(-float64(frameWidth)/2, -float64(frameHeight)/2)
 			op1.GeoM.Translate(300+100*float64(i), screenHeight/2)
@@ -170,14 +196,23 @@ func (g *Game) StartGame(screen *ebiten.Image) {
 		}
 
 	} else {
-		for i := 0; i < 5; i++ {
+		for i := 0; i < g.numberOfDice; i++ {
+
 			// Показываем финальный результат (грань, на которой остановился кубик)
 			op1 := &ebiten.DrawImageOptions{}
 			op1.GeoM.Translate(-float64(frameWidth)/2, -float64(frameHeight)/2)
 			op1.GeoM.Translate(300+100*float64(i), screenHeight/2)
 
-			sx, sy := frameOX+g.result[i]*frameWidth, frameOY
+			sx, sy := frameOX+(g.result[i]-1)*frameWidth, frameOY
 			screen.DrawImage(g.diceImage1.SubImage(image.Rect(sx, sy, sx+frameWidth-2, sy+frameHeight)).(*ebiten.Image), op1)
+			if g.round > 0 {
+
+				//g.players[g.currentPlayer].score[g.round-1] = g.calculateScore(g.result)
+				g.addScore()
+				menuContunue(screen)
+
+			}
+
 		}
 
 	}
@@ -192,7 +227,7 @@ func menu(screen *ebiten.Image) {
 		y := screenHeight/2 + i*30
 
 		// Если элемент выбран, заливаем его фон другим цветом
-		if i == selectedIndex {
+		if i == playerIndex {
 
 			vector.DrawFilledRect(screen, float32(x-10), float32(y-20), 150, 30, color.RGBA{150, 0, 0, 255}, true) // Зеленый фон
 		}
@@ -201,23 +236,219 @@ func menu(screen *ebiten.Image) {
 		text.Draw(screen, option, face, x, y, color.White)
 	}
 }
-func score(screen *ebiten.Image, score []int) {
+func menuContunue(screen *ebiten.Image) {
+
 	face := basicfont.Face7x13
-	// Отрисовка меню
-	x := 10
-	y := 30
-	txt := ""
-	txt += "Player 1:\n"
-	var sum int
-	for i := range score {
-		sum += score[i]
-		txt += fmt.Sprintf("%3d", score[i]) + "\n"
+	text.Draw(screen, "Continue?", face, screenWidth/2-55, screenHeight/2+70, color.White)
+	// Отрисовка меню-
+	for i, option := range options2 {
+		x := screenWidth/2 - i*100
+		y := screenHeight/2 + 100
+
+		// Если элемент выбран, заливаем его фон другим цветом
+		if i == continueIndex {
+			vector.DrawFilledRect(screen, float32(x-10), float32(y-20), 50, 30, color.RGBA{150, 0, 0, 255}, true) // Зеленый фон
+		}
+
+		// Отрисовка текста опции
+		text.Draw(screen, option, face, x, y, color.White)
 	}
-	txt += "Result:" + fmt.Sprint(sum) + "\n"
-	// Если элемент выбран, заливаем его фон другим цветом
-	//vector.DrawFilledRect(screen, float32(x), float32(y), 150, 30, color.RGBA{0, 0, 0, 0}, true) // Зеленый фон
+}
 
-	// Отрисовка текста опции
-	text.Draw(screen, txt, face, x, y, color.White)
+func (g *Game) score2(screen *ebiten.Image) {
+	for count, player := range g.players {
+		switch count {
+		case 0:
+			face := basicfont.Face7x13
+			// Отрисовка меню
+			x := 10
+			y := 30
+			txt := ""
+			txt += "Player 1:\n"
+			var sum int
+			for i := 0; i < len(player.score); i++ {
+				sum += player.score[i]
+				txt += fmt.Sprintf("%3d", player.score[i]) + "\n"
+			}
 
+			txt += "Result:" + fmt.Sprint(sum) + "\n"
+			// Если элемент выбран, заливаем его фон другим цветом
+			if g.currentPlayer == 0 {
+				vector.DrawFilledRect(screen, float32(x)-5, float32(y-17), 100, 20, color.RGBA{0, 0, 200, 0}, true) // Зеленый фон
+			}
+
+			// Отрисовка текста опции
+			text.Draw(screen, txt, face, x, y, color.White)
+		case 1:
+			face := basicfont.Face7x13
+			// Отрисовка меню
+			x := screenWidth - 300
+			y := 30
+			txt := ""
+			txt += "Player 2:\n"
+			var sum int
+			for i := 0; i < len(player.score); i++ {
+				sum += player.score[i]
+				txt += fmt.Sprintf("%3d", player.score[i]) + "\n"
+			}
+
+			txt += "Result:" + fmt.Sprint(sum) + "\n"
+			// Если элемент выбран, заливаем его фон другим цветом
+			if g.currentPlayer == 1 {
+				vector.DrawFilledRect(screen, float32(x)-5, float32(y-17), 100, 20, color.RGBA{0, 0, 200, 0}, true) // Зеленый фон
+			}
+			// Отрисовка текста опции
+			text.Draw(screen, txt, face, x, y, color.White)
+
+		}
+	}
+
+}
+
+func countDice(dice []int) map[int]int {
+	counts := make(map[int]int)
+	for _, d := range dice {
+		counts[d]++
+	}
+	return counts
+}
+
+// Проверка на специальные комбинации (1,2,3,4,5) или (2,3,4,5,6)
+func checkSpecialCombos(dice []int) int {
+	sort.Ints(dice)
+	if len(dice) == 5 {
+		if equalSlices(dice, []int{1, 2, 3, 4, 5}) {
+			return 125
+		}
+		if equalSlices(dice, []int{2, 3, 4, 5, 6}) {
+			return 250
+		}
+	}
+	return 0
+}
+
+func equalSlices(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func (g *Game) calculateScore() int {
+	counts := countDice(g.result)
+	score := 0
+	dices := 0
+
+	// Проверяем на специальные комбинации
+	score += checkSpecialCombos(g.result)
+
+	// Подсчет очков для троек, четверок и пятерок одинаковых значений
+	for value, count := range counts {
+		switch value {
+		case 1:
+			if count == 3 {
+				score += 100
+				dices += 3
+			} else if count == 4 {
+				score += 200
+				dices += 4
+			} else if count == 5 {
+				score += 1000
+			} else {
+				score += count * 10 // за каждую 1 - 10 очков
+				dices += 1 * count
+			}
+		case 2:
+			if count == 3 {
+				dices += 3
+				score += 20
+			} else if count == 4 {
+				dices += 4
+				score += 40
+			} else if count == 5 {
+				score += 200
+			}
+		case 3:
+			if count == 3 {
+				score += 30
+				dices += 3
+			} else if count == 4 {
+				score += 60
+				dices += 4
+			} else if count == 5 {
+				score += 300
+			}
+		case 4:
+			if count == 3 {
+				score += 40
+				dices += 3
+			} else if count == 4 {
+				score += 80
+				dices += 4
+			} else if count == 5 {
+				score += 400
+			}
+		case 5:
+			if count == 3 {
+				dices += 3
+				score += 50
+			} else if count == 4 {
+				score += 100
+				dices += 4
+			} else if count == 5 {
+				score += 500
+			} else {
+				score += count * 5
+				dices += 1 * count // за каждую 5 - 5 очков
+			}
+		case 6:
+			if count == 3 {
+				dices += 3
+				score += 60
+			} else if count == 4 {
+				dices += 4
+				score += 120
+			} else if count == 5 {
+				score += 600
+			}
+		}
+	}
+	//g.numberOfDice = 5 - dices
+	return score
+}
+func (g *Game) rollDice() []int {
+	dice := make([]int, g.numberOfDice)
+	for i := range dice {
+		dice[i] = rand.Intn(6) + 1
+	}
+	return dice
+}
+
+func (g *Game) changePlayer() {
+	if g.currentPlayer == 0 {
+		g.currentPlayer = 1
+	} else {
+		g.currentPlayer = 0
+	}
+}
+func (p Player) getPhase() int {
+	var count int
+	for _, _ = range p.score {
+		count++
+	}
+	return count
+}
+
+func (g *Game) rollingAnimation() {
+	for i := 0; i < g.numberOfDice; i++ {
+
+	}
+}
+func (g *Game) addScore() {
+	g.players[g.currentPlayer].score[g.round-1] = g.calculateScore()
 }
