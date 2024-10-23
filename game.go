@@ -146,7 +146,7 @@ func (g *Game) Update() error {
 		// Если прошло больше времени, чем rollDuration, останавливаем анимацию
 		if now.Sub(g.startTime) > rollDuration {
 			g.rolling = false
-
+			g.addScore()
 		}
 	}
 
@@ -208,7 +208,7 @@ func (g *Game) StartGame(screen *ebiten.Image) {
 			if g.round > 0 {
 
 				//g.players[g.currentPlayer].score[g.round-1] = g.calculateScore(g.result)
-				g.addScore()
+
 				menuContunue(screen)
 
 			}
