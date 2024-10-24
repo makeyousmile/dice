@@ -6,9 +6,13 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/text"
 	"github.com/hajimehoshi/ebiten/v2/vector"
+	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/font/opentype"
 	"image"
 	"image/color"
+	"io/ioutil"
+	"log"
 	"math/rand"
 	"sort"
 	"time"
@@ -51,6 +55,8 @@ type Game struct {
 	result        []int
 	round         int
 	numberOfDice  int
+	temp          int
+	fontFace      font.Face
 }
 type Player struct {
 	score        map[int]int
@@ -68,6 +74,11 @@ func NewGame() *Game {
 	g.round = 0
 	g.players = make(map[int]Player)
 
+	fontFace, err := loadFontFace("fox.ttf", 16)
+	if err != nil {
+		log.Fatalf("could not load font: %v", err)
+	}
+	g.fontFace = fontFace
 	// Инициализируем случайное число для броска
 	rand.Seed(time.Now().UnixNano())
 
@@ -127,10 +138,12 @@ func (g *Game) Update() error {
 	// Если нажата клавиша пробел и анимация не идет, начинаем бросок кубика
 	if ebiten.IsKeyPressed(ebiten.KeySpace) && !g.rolling {
 		if continueIndex == 0 {
+			g.numberOfDice = 5
 			g.changePlayer()
 			g.round = g.players[g.currentPlayer].getPhase()
 			continueIndex = 1
-			g.numberOfDice = 5
+		} else {
+
 		}
 		g.StartRolling()
 		g.round++
@@ -186,32 +199,16 @@ func (g *Game) StartRolling() {
 
 func (g *Game) StartGame(screen *ebiten.Image) {
 	if g.rolling {
-		for i := 0; i < g.numberOfDice; i++ {
-			op1 := &ebiten.DrawImageOptions{}
-			op1.GeoM.Translate(-float64(frameWidth)/2, -float64(frameHeight)/2)
-			op1.GeoM.Translate(300+100*float64(i), screenHeight/2)
-			n := (g.count / 5) % frameCount
-			sx, sy := frameOX+n*frameWidth, frameOY
-			screen.DrawImage(g.diceImage1.SubImage(image.Rect(sx, sy, sx+frameWidth-2, sy+frameHeight)).(*ebiten.Image), op1)
-		}
+		g.ShowAnimateDices(screen)
 
 	} else {
-		for i := 0; i < g.numberOfDice; i++ {
+		g.ShowDices(screen, g.result)
+		if g.round > 0 {
 
-			// Показываем финальный результат (грань, на которой остановился кубик)
-			op1 := &ebiten.DrawImageOptions{}
-			op1.GeoM.Translate(-float64(frameWidth)/2, -float64(frameHeight)/2)
-			op1.GeoM.Translate(300+100*float64(i), screenHeight/2)
-
-			sx, sy := frameOX+(g.result[i]-1)*frameWidth, frameOY
-			screen.DrawImage(g.diceImage1.SubImage(image.Rect(sx, sy, sx+frameWidth-2, sy+frameHeight)).(*ebiten.Image), op1)
-			if g.round > 0 {
-
-				//g.players[g.currentPlayer].score[g.round-1] = g.calculateScore(g.result)
-
-				menuContunue(screen)
-
-			}
+			//g.players[g.currentPlayer].score[g.round-1] = g.calculateScore(g.result)
+			log.Print(g.temp)
+			g.numberOfDice = g.temp
+			menuContunue(screen)
 
 		}
 
@@ -259,10 +256,10 @@ func (g *Game) score2(screen *ebiten.Image) {
 	for count, player := range g.players {
 		switch count {
 		case 0:
-			face := basicfont.Face7x13
+			//face := basicfont.Face7x13
 			// Отрисовка меню
-			x := 10
-			y := 30
+			x := 50
+			y := 50
 			txt := ""
 			txt += "Player 1:\n"
 			var sum int
@@ -278,12 +275,12 @@ func (g *Game) score2(screen *ebiten.Image) {
 			}
 
 			// Отрисовка текста опции
-			text.Draw(screen, txt, face, x, y, color.White)
+			text.Draw(screen, txt, g.fontFace, x, y, color.White)
 		case 1:
-			face := basicfont.Face7x13
+			//face := basicfont.Face7x13
 			// Отрисовка меню
-			x := screenWidth - 300
-			y := 30
+			x := screenWidth - 250
+			y := 50
 			txt := ""
 			txt += "Player 2:\n"
 			var sum int
@@ -298,7 +295,8 @@ func (g *Game) score2(screen *ebiten.Image) {
 				vector.DrawFilledRect(screen, float32(x)-5, float32(y-17), 100, 20, color.RGBA{0, 0, 200, 0}, true) // Зеленый фон
 			}
 			// Отрисовка текста опции
-			text.Draw(screen, txt, face, x, y, color.White)
+			alphaColor := color.RGBA{0, 0, 255, 0}
+			text.Draw(screen, txt, g.fontFace, x, y, alphaColor)
 
 		}
 	}
@@ -418,14 +416,19 @@ func (g *Game) calculateScore() int {
 			}
 		}
 	}
-	//g.numberOfDice = 5 - dices
+	g.temp = g.numberOfDice - dices
 	return score
 }
 func (g *Game) rollDice() []int {
-	dice := make([]int, g.numberOfDice)
-	for i := range dice {
-		dice[i] = rand.Intn(6) + 1
+	//dice := make([]int, g.numberOfDice)
+	//for i := range dice {
+	//	dice[i] = rand.Intn(6) + 1
+	//}
+	var dice []int
+	for i := 1; i <= g.numberOfDice; i++ {
+		dice = append(dice, rand.Intn(6)+1)
 	}
+	log.Print(dice)
 	return dice
 }
 
@@ -451,4 +454,53 @@ func (g *Game) rollingAnimation() {
 }
 func (g *Game) addScore() {
 	g.players[g.currentPlayer].score[g.round-1] = g.calculateScore()
+}
+func (g *Game) ShowDices(screen *ebiten.Image, dices []int) {
+
+	for i, dice := range dices {
+		log.Print(dice)
+		op1 := &ebiten.DrawImageOptions{}
+		op1.GeoM.Translate(-float64(frameWidth)/2, -float64(frameHeight)/2)
+		op1.GeoM.Translate(300+100*float64(i), screenHeight/2)
+
+		sx, sy := frameOX+(g.result[i]-1)*frameWidth, frameOY
+		screen.DrawImage(g.diceImage1.SubImage(image.Rect(sx, sy, sx+frameWidth-2, sy+frameHeight)).(*ebiten.Image), op1)
+	}
+}
+func (g *Game) ShowAnimateDices(screen *ebiten.Image) {
+
+	for i := 0; i < g.numberOfDice; i++ {
+		op1 := &ebiten.DrawImageOptions{}
+		op1.GeoM.Translate(-float64(frameWidth)/2, -float64(frameHeight)/2)
+		op1.GeoM.Translate(300+100*float64(i), screenHeight/2)
+		n := (g.count / 5) % frameCount
+		sx, sy := frameOX+n*frameWidth, frameOY
+		screen.DrawImage(g.diceImage1.SubImage(image.Rect(sx, sy, sx+frameWidth-2, sy+frameHeight)).(*ebiten.Image), op1)
+	}
+}
+func loadFontFace(path string, size float64) (font.Face, error) {
+	// Чтение файла шрифта
+	fontBytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not read font: %w", err)
+	}
+
+	// Парсинг шрифта
+	tt, err := opentype.Parse(fontBytes)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse font: %w", err)
+	}
+
+	// Загрузка шрифта с нужным размером
+	const dpi = 72
+	face, err := opentype.NewFace(tt, &opentype.FaceOptions{
+		Size:    size,
+		DPI:     dpi,
+		Hinting: font.HintingFull,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not create font face: %w", err)
+	}
+
+	return face, nil
 }
