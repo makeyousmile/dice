@@ -43,24 +43,28 @@ var (
 
 // Game struct хранит состояние игры
 type Game struct {
-	rolling       bool      // флаг, указывающий на то, что кубик в процессе броска
-	startTime     time.Time // время начала анимации
-	lastFrameTime time.Time // Время последнего изменения кадра анимации
-	width, height int
-	diceImage1    *ebiten.Image
-	count         int
-	stage         int
-	players       map[int]Player
-	currentPlayer int
-	result        []int
-	round         int
-	numberOfDice  int
-	temp          int
-	fontFace      font.Face
+	rolling        bool      // флаг, указывающий на то, что кубик в процессе броска
+	startTime      time.Time // время начала анимации
+	lastFrameTime  time.Time // Время последнего изменения кадра анимации
+	startTimeLoose time.Time
+	width, height  int
+	diceImage1     *ebiten.Image
+	count          int
+	stage          int
+	players        map[int]Player
+	currentPlayer  int
+	result         []int
+	round          int
+	numberOfDice   int
+	temp           int
+	fontFace       font.Face
+	loose          bool
 }
 type Player struct {
 	score        map[int]int
+	round        int
 	numberOfDice int
+	loose        bool
 }
 
 // NewGame создаёт новую игру и загружает изображения кубика
@@ -70,7 +74,7 @@ func NewGame() *Game {
 	g.height = screenHeight
 	g.diceImage1, _, _ = ebitenutil.NewImageFromFile("dice.png")
 	g.numberOfDice = 5
-	g.result = g.rollDice()
+	g.result = []int{1, 2, 3, 4, 5}
 	g.round = 0
 	g.players = make(map[int]Player)
 
@@ -137,18 +141,25 @@ func (g *Game) Update() error {
 	g.count++
 	// Если нажата клавиша пробел и анимация не идет, начинаем бросок кубика
 	if ebiten.IsKeyPressed(ebiten.KeySpace) && !g.rolling {
+
 		if continueIndex == 0 {
-			g.numberOfDice = 5
+
 			g.changePlayer()
 			g.round = g.players[g.currentPlayer].getPhase()
 			continueIndex = 1
 		} else {
 
 		}
+
 		g.StartRolling()
 		g.round++
+		g.rollDice()
+		g.addScore()
+		log.Print(g.result)
 	}
-
+	if ebiten.IsKeyPressed(ebiten.KeySpace) {
+		g.startTimeLoose = time.Now()
+	}
 	// Если идет анимация, обновляем результат броска в течение времени rollDuration
 	if g.rolling {
 		now := time.Now()
@@ -159,7 +170,7 @@ func (g *Game) Update() error {
 		// Если прошло больше времени, чем rollDuration, останавливаем анимацию
 		if now.Sub(g.startTime) > rollDuration {
 			g.rolling = false
-			g.addScore()
+
 		}
 	}
 
@@ -193,7 +204,6 @@ func (g *Game) StartRolling() {
 	g.rolling = true
 	g.startTime = time.Now()
 	g.lastFrameTime = g.startTime
-	g.result = g.rollDice()
 
 }
 
@@ -202,18 +212,26 @@ func (g *Game) StartGame(screen *ebiten.Image) {
 		g.ShowAnimateDices(screen)
 
 	} else {
-		g.ShowDices(screen, g.result)
+		g.ShowDices(screen)
 		if g.round > 0 {
 
 			//g.players[g.currentPlayer].score[g.round-1] = g.calculateScore(g.result)
-			log.Print(g.temp)
+
 			g.numberOfDice = g.temp
 			menuContunue(screen)
+			log.Print(g.loose)
+			if g.loose {
+				g.showText(screen, 330, 100, 50, "Proebal")
+			}
 
 		}
 
 	}
 	//ebitenutil.DebugPrint(screen, "Press SPACE to roll the dice")
+	if time.Since(g.startTimeLoose) > 4*time.Second {
+
+		g.loose = false
+	}
 }
 func menu(screen *ebiten.Image) {
 
@@ -254,6 +272,7 @@ func menuContunue(screen *ebiten.Image) {
 
 func (g *Game) score2(screen *ebiten.Image) {
 	for count, player := range g.players {
+
 		switch count {
 		case 0:
 			//face := basicfont.Face7x13
@@ -264,6 +283,9 @@ func (g *Game) score2(screen *ebiten.Image) {
 			txt += "Player 1:\n"
 			var sum int
 			for i := 0; i < len(player.score); i++ {
+				if player.score[i] == 0 {
+					continue
+				}
 				sum += player.score[i]
 				txt += fmt.Sprintf("%3d", player.score[i]) + "\n"
 			}
@@ -295,8 +317,8 @@ func (g *Game) score2(screen *ebiten.Image) {
 				vector.DrawFilledRect(screen, float32(x)-5, float32(y-17), 100, 20, color.RGBA{0, 0, 200, 0}, true) // Зеленый фон
 			}
 			// Отрисовка текста опции
-			alphaColor := color.RGBA{0, 0, 255, 0}
-			text.Draw(screen, txt, g.fontFace, x, y, alphaColor)
+			//alphaColor := color.RGBA{0, 0, 255, 0}
+			text.Draw(screen, txt, g.fontFace, x, y, color.White)
 
 		}
 	}
@@ -416,10 +438,17 @@ func (g *Game) calculateScore() int {
 			}
 		}
 	}
-	g.temp = g.numberOfDice - dices
+	if score == 0 {
+		g.temp = 5
+		g.loose = true
+		g.changePlayer()
+	} else {
+		g.temp = g.numberOfDice - dices
+	}
+	log.Print("calculate score", score)
 	return score
 }
-func (g *Game) rollDice() []int {
+func (g *Game) rollDice() {
 	//dice := make([]int, g.numberOfDice)
 	//for i := range dice {
 	//	dice[i] = rand.Intn(6) + 1
@@ -428,11 +457,13 @@ func (g *Game) rollDice() []int {
 	for i := 1; i <= g.numberOfDice; i++ {
 		dice = append(dice, rand.Intn(6)+1)
 	}
-	log.Print(dice)
-	return dice
+
+	g.result = dice
 }
 
 func (g *Game) changePlayer() {
+	g.round = g.players[g.currentPlayer].getPhase()
+	g.numberOfDice = 5
 	if g.currentPlayer == 0 {
 		g.currentPlayer = 1
 	} else {
@@ -452,13 +483,22 @@ func (g *Game) rollingAnimation() {
 
 	}
 }
-func (g *Game) addScore() {
-	g.players[g.currentPlayer].score[g.round-1] = g.calculateScore()
-}
-func (g *Game) ShowDices(screen *ebiten.Image, dices []int) {
+func (g *Game) addScore() bool {
+	score := g.calculateScore()
+	if score != 0 {
+		g.players[g.currentPlayer].score[g.round-1] = score
 
-	for i, dice := range dices {
-		log.Print(dice)
+		return true
+	} else {
+
+		log.Print("na podumat")
+		return false
+		//g.players[g.currentPlayer].score[g.round-1] = g.calculateScore()
+	}
+}
+func (g *Game) ShowDices(screen *ebiten.Image) {
+
+	for i, _ := range g.result {
 		op1 := &ebiten.DrawImageOptions{}
 		op1.GeoM.Translate(-float64(frameWidth)/2, -float64(frameHeight)/2)
 		op1.GeoM.Translate(300+100*float64(i), screenHeight/2)
@@ -477,6 +517,9 @@ func (g *Game) ShowAnimateDices(screen *ebiten.Image) {
 		sx, sy := frameOX+n*frameWidth, frameOY
 		screen.DrawImage(g.diceImage1.SubImage(image.Rect(sx, sy, sx+frameWidth-2, sy+frameHeight)).(*ebiten.Image), op1)
 	}
+}
+func (g Game) showChangePlayer() {
+
 }
 func loadFontFace(path string, size float64) (font.Face, error) {
 	// Чтение файла шрифта
@@ -503,4 +546,12 @@ func loadFontFace(path string, size float64) (font.Face, error) {
 	}
 
 	return face, nil
+}
+
+func (g *Game) showText(screen *ebiten.Image, x, y, size int, txt string) {
+	fontFace, err := loadFontFace("fox.ttf", float64(size))
+	if err != nil {
+		log.Fatalf("could not load font: %v", err)
+	}
+	text.Draw(screen, txt, fontFace, x, y, color.White)
 }
