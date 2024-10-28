@@ -154,7 +154,7 @@ func (g *Game) Update() error {
 		g.StartRolling()
 		g.round++
 		g.rollDice()
-		g.addScore()
+
 		log.Print(g.result)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeySpace) {
@@ -170,8 +170,10 @@ func (g *Game) Update() error {
 		// Если прошло больше времени, чем rollDuration, останавливаем анимацию
 		if now.Sub(g.startTime) > rollDuration {
 			g.rolling = false
-
+			g.addScore()
 		}
+	} else {
+
 	}
 
 	return nil
@@ -208,6 +210,7 @@ func (g *Game) StartRolling() {
 }
 
 func (g *Game) StartGame(screen *ebiten.Image) {
+
 	if g.rolling {
 		g.ShowAnimateDices(screen)
 
@@ -219,16 +222,15 @@ func (g *Game) StartGame(screen *ebiten.Image) {
 
 			g.numberOfDice = g.temp
 			menuContunue(screen)
-			log.Print(g.loose)
-			if g.loose {
-				g.showText(screen, 330, 100, 50, "Proebal")
-			}
 
 		}
 
 	}
+	if g.loose {
+		g.showText(screen, 330, 100, 50, "Proebal")
+	}
 	//ebitenutil.DebugPrint(screen, "Press SPACE to roll the dice")
-	if time.Since(g.startTimeLoose) > 4*time.Second {
+	if time.Since(g.startTimeLoose) > 2*time.Second {
 
 		g.loose = false
 	}
@@ -444,7 +446,12 @@ func (g *Game) calculateScore() int {
 		g.changePlayer()
 	} else {
 		g.temp = g.numberOfDice - dices
+		if g.temp == 0 {
+			g.temp = 5
+			g.numberOfDice = 5
+		}
 	}
+
 	log.Print("calculate score", score)
 	return score
 }
@@ -462,13 +469,15 @@ func (g *Game) rollDice() {
 }
 
 func (g *Game) changePlayer() {
-	g.round = g.players[g.currentPlayer].getPhase()
+
+	log.Print(g.round)
 	g.numberOfDice = 5
 	if g.currentPlayer == 0 {
 		g.currentPlayer = 1
 	} else {
 		g.currentPlayer = 0
 	}
+	g.round = g.players[g.currentPlayer].getPhase()
 }
 func (p Player) getPhase() int {
 	var count int
@@ -491,7 +500,6 @@ func (g *Game) addScore() bool {
 		return true
 	} else {
 
-		log.Print("na podumat")
 		return false
 		//g.players[g.currentPlayer].score[g.round-1] = g.calculateScore()
 	}
