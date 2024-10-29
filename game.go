@@ -59,6 +59,7 @@ type Game struct {
 	temp           int
 	fontFace       font.Face
 	loose          bool
+	turn           int
 }
 type Player struct {
 	score        map[int]int
@@ -92,7 +93,6 @@ func NewGame() *Game {
 // Update обновляет состояние игры каждый кадр
 func (g *Game) Update() error {
 	now := time.Now()
-
 	// Проверяем, прошло ли достаточно времени с момента последнего нажатия
 	switch g.round {
 	case 0:
@@ -139,13 +139,14 @@ func (g *Game) Update() error {
 	}
 
 	g.count++
+
 	// Если нажата клавиша пробел и анимация не идет, начинаем бросок кубика
 	if ebiten.IsKeyPressed(ebiten.KeySpace) && !g.rolling {
 
 		if continueIndex == 0 {
 
 			g.changePlayer()
-			g.round = g.players[g.currentPlayer].getPhase()
+			//g.round = g.players[g.currentPlayer].getPhase()
 			continueIndex = 1
 		} else {
 
@@ -153,9 +154,10 @@ func (g *Game) Update() error {
 
 		g.StartRolling()
 		g.round++
+		g.turn++
+		log.Print(g.turn)
 		g.rollDice()
 
-		log.Print(g.result)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeySpace) {
 		g.startTimeLoose = time.Now()
@@ -444,6 +446,7 @@ func (g *Game) calculateScore() int {
 		g.temp = 5
 		g.loose = true
 		g.changePlayer()
+
 	} else {
 		g.temp = g.numberOfDice - dices
 		if g.temp == 0 {
@@ -452,7 +455,6 @@ func (g *Game) calculateScore() int {
 		}
 	}
 
-	log.Print("calculate score", score)
 	return score
 }
 func (g *Game) rollDice() {
@@ -470,14 +472,18 @@ func (g *Game) rollDice() {
 
 func (g *Game) changePlayer() {
 
-	log.Print(g.round)
 	g.numberOfDice = 5
+	g.removeScore()
 	if g.currentPlayer == 0 {
 		g.currentPlayer = 1
 	} else {
 		g.currentPlayer = 0
 	}
 	g.round = g.players[g.currentPlayer].getPhase()
+	player := g.players[g.currentPlayer]
+	log.Print(player.round)
+
+	g.turn = 0
 }
 func (p Player) getPhase() int {
 	var count int
@@ -562,4 +568,12 @@ func (g *Game) showText(screen *ebiten.Image, x, y, size int, txt string) {
 		log.Fatalf("could not load font: %v", err)
 	}
 	text.Draw(screen, txt, fontFace, x, y, color.White)
+}
+func (g *Game) removeScore() {
+	player := g.players[g.currentPlayer].score
+
+	for i := 0; i < g.turn+1; i++ {
+		delete(player, g.turn-i)
+	}
+
 }
