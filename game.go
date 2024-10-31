@@ -33,7 +33,7 @@ const (
 )
 
 var (
-	options       = []string{"2 Players", "3 Players", "4 Players"}
+	options       = []string{"2 игрока", "3 игрока", "4 игрока"}
 	options2      = []string{"No", "Yes"}
 	playerIndex   = 0
 	continueIndex = 1
@@ -79,7 +79,7 @@ func NewGame() *Game {
 	g.round = 0
 	g.players = make(map[int]Player)
 
-	fontFace, err := loadFontFace("fox.ttf", 16)
+	fontFace, err := loadFontFace("Carlito-Bold.ttf", 16)
 	if err != nil {
 		log.Fatalf("could not load font: %v", err)
 	}
@@ -189,7 +189,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	case 0:
 		menu(screen)
 	case 1:
-		g.score2(screen)
+		g.showScore(screen)
 		g.StartGame(screen)
 
 	}
@@ -220,7 +220,7 @@ func (g *Game) StartGame(screen *ebiten.Image) {
 		g.ShowDices(screen)
 		if g.round > 0 {
 
-			//g.players[g.currentPlayer].score[g.round-1] = g.calculateScore(g.result)
+			//g.players[g.currentPlayer].showScore[g.round-1] = g.calculateScore(g.result)
 
 			g.numberOfDice = g.temp
 			menuContunue(screen)
@@ -229,7 +229,7 @@ func (g *Game) StartGame(screen *ebiten.Image) {
 
 	}
 	if g.loose {
-		g.showText(screen, 330, 100, 50, "Proebal")
+		g.showText(screen, 410, 100, 50, "Переход хода")
 	}
 	//ebitenutil.DebugPrint(screen, "Press SPACE to roll the dice")
 	if time.Since(g.startTimeLoose) > 2*time.Second {
@@ -239,11 +239,14 @@ func (g *Game) StartGame(screen *ebiten.Image) {
 }
 func menu(screen *ebiten.Image) {
 
-	face := basicfont.Face7x13
+	face, err := loadFontFace("Carlito-regular.ttf", 30)
+	if err != nil {
+		log.Print(err)
+	}
 	// Отрисовка меню
 	for i, option := range options {
 		x := screenWidth/2 - 50
-		y := screenHeight/2 + i*30
+		y := screenHeight/2 + i*50
 
 		// Если элемент выбран, заливаем его фон другим цветом
 		if i == playerIndex {
@@ -274,7 +277,7 @@ func menuContunue(screen *ebiten.Image) {
 	}
 }
 
-func (g *Game) score2(screen *ebiten.Image) {
+func (g *Game) showScore(screen *ebiten.Image) {
 	for count, player := range g.players {
 
 		switch count {
@@ -284,7 +287,7 @@ func (g *Game) score2(screen *ebiten.Image) {
 			x := 50
 			y := 50
 			txt := ""
-			txt += "Player 1:\n"
+			txt += "Игрок 1:\n"
 			var sum int
 			for i := 0; i < len(player.score); i++ {
 				if player.score[i] == 0 {
@@ -294,10 +297,10 @@ func (g *Game) score2(screen *ebiten.Image) {
 				txt += fmt.Sprintf("%3d", player.score[i]) + "\n"
 			}
 
-			txt += "Result:" + fmt.Sprint(sum) + "\n"
+			txt += "Сумма:" + fmt.Sprint(sum) + "\n"
 			// Если элемент выбран, заливаем его фон другим цветом
 			if g.currentPlayer == 0 {
-				vector.DrawFilledRect(screen, float32(x)-5, float32(y-17), 100, 20, color.RGBA{0, 0, 200, 0}, true) // Зеленый фон
+				vector.DrawFilledRect(screen, float32(x)-5, float32(y-17), 100, 20, color.RGBA{0, 0, 200, 255}, true) // Зеленый фон
 			}
 
 			// Отрисовка текста опции
@@ -305,20 +308,23 @@ func (g *Game) score2(screen *ebiten.Image) {
 		case 1:
 			//face := basicfont.Face7x13
 			// Отрисовка меню
-			x := screenWidth - 250
+			x := screenWidth - 100
 			y := 50
 			txt := ""
-			txt += "Player 2:\n"
+			txt += "Игрок 2:\n"
 			var sum int
 			for i := 0; i < len(player.score); i++ {
+				if player.score[i] == 0 {
+					continue
+				}
 				sum += player.score[i]
 				txt += fmt.Sprintf("%3d", player.score[i]) + "\n"
 			}
 
-			txt += "Result:" + fmt.Sprint(sum) + "\n"
+			txt += "Сумма:" + fmt.Sprint(sum) + "\n"
 			// Если элемент выбран, заливаем его фон другим цветом
 			if g.currentPlayer == 1 {
-				vector.DrawFilledRect(screen, float32(x)-5, float32(y-17), 100, 20, color.RGBA{0, 0, 200, 0}, true) // Зеленый фон
+				vector.DrawFilledRect(screen, float32(x)-5, float32(y-17), 100, 20, color.RGBA{0, 0, 200, 255}, true) // Зеленый фон
 			}
 			// Отрисовка текста опции
 			//alphaColor := color.RGBA{0, 0, 255, 0}
@@ -445,6 +451,7 @@ func (g *Game) calculateScore() int {
 	if score == 0 {
 		g.temp = 5
 		g.loose = true
+		g.removeScore()
 		g.changePlayer()
 
 	} else {
@@ -473,7 +480,6 @@ func (g *Game) rollDice() {
 func (g *Game) changePlayer() {
 
 	g.numberOfDice = 5
-	g.removeScore()
 	if g.currentPlayer == 0 {
 		g.currentPlayer = 1
 	} else {
@@ -507,7 +513,7 @@ func (g *Game) addScore() bool {
 	} else {
 
 		return false
-		//g.players[g.currentPlayer].score[g.round-1] = g.calculateScore()
+		//g.players[g.currentPlayer].showScore[g.round-1] = g.calculateScore()
 	}
 }
 func (g *Game) ShowDices(screen *ebiten.Image) {
@@ -563,17 +569,21 @@ func loadFontFace(path string, size float64) (font.Face, error) {
 }
 
 func (g *Game) showText(screen *ebiten.Image, x, y, size int, txt string) {
-	fontFace, err := loadFontFace("fox.ttf", float64(size))
+	fontFace, err := loadFontFace("Carlito-Bold.ttf", float64(size))
 	if err != nil {
 		log.Fatalf("could not load font: %v", err)
 	}
-	text.Draw(screen, txt, fontFace, x, y, color.White)
+	textColor := color.RGBA{245, 0, 0, 250}
+	text.Draw(screen, txt, fontFace, x, y, textColor)
 }
 func (g *Game) removeScore() {
 	player := g.players[g.currentPlayer].score
+	n := len(player)
+	for i := 1; i < g.turn; i++ {
 
-	for i := 0; i < g.turn+1; i++ {
-		delete(player, g.turn-i)
+		log.Print(player, n-i)
+		delete(player, n-i)
+
 	}
 
 }

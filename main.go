@@ -9,7 +9,8 @@ func main() {
 	game := NewGame()
 	// Запускаем игру
 	ebiten.SetWindowSize(1024, 768)
-	ebiten.SetWindowTitle("Dice Roll with 2D Animation")
+	ebiten.SetWindowDecorated(false) // Убираем рамки и панель заголовка
+	ebiten.SetWindowTitle("Dice Roll")
 	if err := ebiten.RunGame(game); err != nil {
 		panic(err)
 	}
