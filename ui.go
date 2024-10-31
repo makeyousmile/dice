@@ -10,13 +10,13 @@ import (
 	"golang.org/x/image/font/opentype"
 	"image"
 	"image/color"
-	"io/ioutil"
 	"log"
+	"os"
 )
 
 func loadFontFace(path string, size float64) (font.Face, error) {
 	// Чтение файла шрифта
-	fontBytes, err := ioutil.ReadFile(path)
+	fontBytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("could not read font: %w", err)
 	}
@@ -136,4 +136,25 @@ func (g *Game) showScore(screen *ebiten.Image) {
 		}
 	}
 
+}
+func menu(screen *ebiten.Image) {
+
+	face, err := loadFontFace("Carlito-regular.ttf", 30)
+	if err != nil {
+		log.Print(err)
+	}
+	// Отрисовка меню
+	for i, option := range options {
+		x := screenWidth/2 - 50
+		y := screenHeight/2 + i*50
+
+		// Если элемент выбран, заливаем его фон другим цветом
+		if i == playerIndex {
+
+			vector.DrawFilledRect(screen, float32(x-10), float32(y-20), 150, 30, color.RGBA{150, 0, 0, 255}, true) // Зеленый фон
+		}
+
+		// Отрисовка текста опции
+		text.Draw(screen, option, face, x, y, color.White)
+	}
 }
