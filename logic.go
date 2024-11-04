@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/hajimehoshi/ebiten/v2"
-	"image"
 	"log"
 	"math/rand"
 	"sort"
@@ -22,6 +21,7 @@ func (g *Game) StartGame(screen *ebiten.Image) {
 		g.ShowAnimateDices(screen)
 
 	} else {
+		g.xy = 0
 		g.ShowDices(screen)
 		if g.round > 0 {
 
@@ -223,21 +223,6 @@ func (g *Game) addScore() bool {
 		return false
 		//g.players[g.currentPlayer].showScore[g.round-1] = g.calculateScore()
 	}
-}
-
-func (g *Game) ShowAnimateDices(screen *ebiten.Image) {
-
-	for i := 0; i < g.numberOfDice; i++ {
-		op1 := &ebiten.DrawImageOptions{}
-		op1.GeoM.Translate(-float64(frameWidth)/2, -float64(frameHeight)/2)
-		op1.GeoM.Translate(300+100*float64(i), screenHeight/2)
-		n := (g.count / 5) % frameCount
-		sx, sy := frameOX+n*frameWidth, frameOY
-		screen.DrawImage(g.diceImage1.SubImage(image.Rect(sx, sy, sx+frameWidth-2, sy+frameHeight)).(*ebiten.Image), op1)
-	}
-}
-func (g Game) showChangePlayer() {
-
 }
 
 func (g *Game) removeScore() {

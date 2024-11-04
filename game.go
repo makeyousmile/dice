@@ -53,6 +53,7 @@ type Game struct {
 	fontFace       font.Face
 	loose          bool
 	turn           int
+	xy             float64
 }
 type Player struct {
 	score        map[int]int
@@ -130,28 +131,30 @@ func (g *Game) Update() error {
 			}
 		}
 	}
+	if g.stage > 0 {
+		if ebiten.IsKeyPressed(ebiten.KeySpace) && !g.rolling {
 
+			if continueIndex == 0 {
+
+				g.changePlayer()
+				//g.round = g.players[g.currentPlayer].getPhase()
+				continueIndex = 1
+			} else {
+
+			}
+
+			g.StartRolling()
+			g.round++
+			g.turn++
+			log.Print(g.turn)
+			g.rollDice()
+
+		}
+	}
 	g.count++
 
 	// Если нажата клавиша пробел и анимация не идет, начинаем бросок кубика
-	if ebiten.IsKeyPressed(ebiten.KeySpace) && !g.rolling {
 
-		if continueIndex == 0 {
-
-			g.changePlayer()
-			//g.round = g.players[g.currentPlayer].getPhase()
-			continueIndex = 1
-		} else {
-
-		}
-
-		g.StartRolling()
-		g.round++
-		g.turn++
-		log.Print(g.turn)
-		g.rollDice()
-
-	}
 	if ebiten.IsKeyPressed(ebiten.KeySpace) {
 		g.startTimeLoose = time.Now()
 	}

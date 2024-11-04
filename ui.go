@@ -11,6 +11,7 @@ import (
 	"image"
 	"image/color"
 	"log"
+	"math/rand"
 	"os"
 )
 
@@ -151,10 +152,24 @@ func menu(screen *ebiten.Image) {
 		// Если элемент выбран, заливаем его фон другим цветом
 		if i == playerIndex {
 
-			vector.DrawFilledRect(screen, float32(x-10), float32(y-20), 150, 30, color.RGBA{150, 0, 0, 255}, true) // Зеленый фон
+			vector.DrawFilledRect(screen, float32(x-20), float32(y-27), 150, 40, color.RGBA{150, 0, 0, 255}, true) // Зеленый фон
 		}
 
 		// Отрисовка текста опции
 		text.Draw(screen, option, face, x, y, color.White)
+	}
+}
+func (g *Game) ShowAnimateDices(screen *ebiten.Image) {
+	g.xy++
+	log.Print(g.xy + -float64(rand.Intn(6)))
+	for i := 0; i < g.numberOfDice; i++ {
+		op1 := &ebiten.DrawImageOptions{}
+		op1.GeoM.Translate(-float64(frameWidth)/2, -float64(frameHeight)/2)
+		//op1.GeoM.Translate(-float64(rand.Intn(6)), -float64(rand.Intn(6)))
+
+		op1.GeoM.Translate(300+100*float64(i), screenHeight/2)
+		n := (g.count / 5) % frameCount
+		sx, sy := frameOX+n*frameWidth, frameOY
+		screen.DrawImage(g.diceImage1.SubImage(image.Rect(sx, sy, sx+frameWidth-2, sy+frameHeight)).(*ebiten.Image), op1)
 	}
 }
